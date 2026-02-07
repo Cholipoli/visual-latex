@@ -1,78 +1,79 @@
-import { Document } from "../model/document"
+// editor/editor.ts
+
+import { baseDocument, DocumentNode, InlineNode } from "../model/document"
 import { Cursor } from "../model/cursor"
 
+// ---- utils ----
+export function getNodeAtPath(
+  root: DocumentNode,
+  path: (string | number)[]
+): DocumentNode | InlineNode | undefined {
+  let node: any = root
+  for (let i = 0; i < path.length; i += 2) {
+    const key = path[i] as string
+    const index = path[i + 1] as number
+    if (!node[key] || !Array.isArray(node[key])) return undefined
+    node = node[key][index]
+  }
+  return node
+}
+
+// ---- editor state ----
 export type EditorState = {
-  document: Document
+  document: DocumentNode
   cursor: Cursor
 }
 
+// ---- initial state ----
 export function createInitialState(): EditorState {
   return {
-    document: {
-      blocks: [
-        {
-          type: "paragraph",
-          content: [{ type: "text", value: "" }]
-        }
-      ]
-    },
+    document: baseDocument,
     cursor: {
-      blockIndex: 0,
-      inlineIndex: 0,
+      path: ["children", 0,"children", 0, "content", 0], // start at the first text node
       offset: 0
     }
   }
 }
 
+// ---- insert char at cursor ----
 export function insertChar(state: EditorState, char: string) {
-  const block = state.document.blocks[state.cursor.blockIndex]
+  const node = getNodeAtPath(state.document, state.cursor.path)
+  if (!node || node.type !== "text") return
 
-  if (block.type !== "paragraph") return
-
-  const inline = block.content[state.cursor.inlineIndex]
-
-  if (inline.type !== "text") return
-
-  const before = inline.value.slice(0, state.cursor.offset)
-  const after = inline.value.slice(state.cursor.offset)
-
-  inline.value = before + char + after
+  const before = node.value.slice(0, state.cursor.offset)
+  const after = node.value.slice(state.cursor.offset)
+  node.value = before + char + after
   state.cursor.offset += 1
-  console.log(state.cursor)
 }
 
+// ---- delete char before cursor ----
 export function supChar(state: EditorState) {
-  const { blockIndex, inlineIndex, offset } = state.cursor
+  const node = getNodeAtPath(state.document, state.cursor.path)
+  if (!node || node.type !== "text") return
 
-  // 1️⃣ rien à supprimer si curseur au début
-  if (offset === 0) return
+  if (state.cursor.offset === 0) return
 
-  const block = state.document.blocks[blockIndex]
-  if (block.type !== "paragraph") return
-
-  const inline = block.content[inlineIndex]
-  if (inline.type !== "text") return
-
-  const before = inline.value.slice(0, offset - 1)
-  const after = inline.value.slice(offset)
-
-  inline.value = before + after
+  const before = node.value.slice(0, state.cursor.offset - 1)
+  const after = node.value.slice(state.cursor.offset)
+  node.value = before + after
   state.cursor.offset -= 1
 }
 
+// ---- move cursor left/right ----
 export function moveCursor(state: EditorState, dir: -1 | 1) {
-  const cursor = state.cursor
-  const block = state.document.blocks[cursor.blockIndex]
+  const node = getNodeAtPath(state.document, state.cursor.path)
+  if (!node || node.type !== "text") return
 
-  if (block.type !== "paragraph") return
-  const inline = block.content[cursor.inlineIndex]
-  if (inline.type !== "text") return
-
-  if (dir === -1 && cursor.offset > 0) {
-    cursor.offset--
+  if (dir === -1 && state.cursor.offset > 0) {
+    state.cursor.offset--
   }
 
-  if (dir === 1 && cursor.offset < inline.value.length) {
-    cursor.offset++
+  if (dir === 1 && state.cursor.offset < node.value.length) {
+    state.cursor.offset++
   }
+}
+
+
+export function moveCursorVertical(state: EditorState, dir: -1 | 1) {
+  //TODO: implement me!
 }
