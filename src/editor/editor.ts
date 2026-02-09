@@ -29,7 +29,7 @@ export function createInitialState(): EditorState {
   return {
     document: baseDocument,
     cursor: {
-      path: ["children", 0,"children", 0, "content", 0], // start at the first text node
+      path: ["children", 0,"children", 1, "content", 0], // start at the first text node
       offset: 0
     }
   }
@@ -73,7 +73,56 @@ export function moveCursor(state: EditorState, dir: -1 | 1) {
   }
 }
 
-
-export function moveCursorVertical(state: EditorState, dir: -1 | 1) {
-  //TODO: implement me!
+// ---- move cursor up/down ----
+type TextEntry = {
+  node: InlineNode & { type: "text" }
+  path: (string | number)[]
 }
+
+function collectTextNodes(
+  node: DocumentNode,
+  basePath: (string | number)[] = []
+): TextEntry[] {
+  const result: TextEntry[] = []
+
+  if ("content" in node && node.content) {
+    node.content.forEach((inline, i) => {
+      if (inline.type === "text") {
+        result.push({
+          node: inline,
+          path: [...basePath, "content", i]
+        })
+      }
+    })
+  }
+
+  if (node.children) {
+    node.children.forEach((child, i) => {
+      result.push(
+        ...collectTextNodes(child, [...basePath, "children", i])
+      )
+    })
+  }
+
+  return result
+}
+function pathsEqual(a: (string | number)[], b: (string | number)[]) {
+  return a.length === b.length && a.every((v, i) => v === b[i])
+}
+export function moveCursorVertical(state: EditorState, dir: -1 | 1) {
+  const texts = collectTextNodes(state.document)
+  if (texts.length === 0) return
+
+  const currentIndex = texts.findIndex(t =>
+    pathsEqual(t.path, state.cursor.path)
+  )
+
+  if (currentIndex === -1) return
+
+  const nextIndex = currentIndex + dir
+  if (nextIndex < 0 || nextIndex >= texts.length) return
+
+  state.cursor.path = [...texts[nextIndex].path]
+  state.cursor.offset = 0
+}
+

@@ -1,7 +1,5 @@
-//cursor.ts
-
+// model/cursor.ts
 export type Cursor = {
-  blockIndex: number
-  inlineIndex: number
-  offset: number
+  path: (string | number)[]   // e.g., ["children", 0, "content", 0]
+  offset: number              // cursor position inside a text node
 }
