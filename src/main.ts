@@ -2,7 +2,7 @@ import { createInitialState } from "./editor/editor"
 import { render } from "./render/render"
 import { insertChar } from "./editor/editor"
 import { supChar } from "./editor/editor"
-import { moveCursor, moveCursorVertical, createNewNode } from "./editor/editor"
+import { moveCursor, moveCursorVertical, createNewNode, transformToHeading } from "./editor/editor"
 
 const state = createInitialState()
 const root = document.getElementById("editor")!
@@ -38,6 +38,10 @@ window.addEventListener("keydown", (e) => {
   }
   else if(e.key === "Enter"){
     createNewNode(state, root)
+  }
+  else if(e.key === "Tab"){
+    transformToHeading(state, "subtitle")
+    render(state, root)
   }
 })
 

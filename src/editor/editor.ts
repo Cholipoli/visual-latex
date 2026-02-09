@@ -146,7 +146,8 @@ function findBlockPath(
       "type" in node &&
       (node.type === "paragraph" ||
        node.type === "title" ||
-       node.type === "subtitle")
+       node.type === "subtitle"||
+       node.type === "subsubtitle")
     ) {
       return subPath
     }
@@ -187,7 +188,7 @@ export function createNewNode(state: EditorState, root: HTMLElement) {
   }
 
   // ───────────── CASE 2: title → child paragraph ─────────────
-  else if (blockNode.type === "title" || blockNode.type === "subtitle") {
+  else if (blockNode.type === "title" || blockNode.type === "subtitle")  {
     if (!blockNode.children) blockNode.children = []
 
     blockNode.children.unshift(newParagraph)
@@ -202,5 +203,115 @@ export function createNewNode(state: EditorState, root: HTMLElement) {
     state.cursor.offset = 0
     console.log(state.cursor.path)
   }
+}
+
+
+
+function isDocumentNode(node: any): node is DocumentNode {
+  return (
+    node &&
+    typeof node === "object" &&
+    "type" in node &&
+    node.type !== "text" &&
+    node.type !== "math"
+  )
+}
+
+function getLevel(node: DocumentNode): number {
+  const LEVEL: Record<DocumentNode["type"], number> = {
+    doc: 0,
+    title: 1,
+    subtitle: 2,
+    subsubtitle: 3,
+    paragraph: 99
+  }
+  return LEVEL[node.type]
+}
+
+function findValidParentPath(
+  document: DocumentNode,
+  startParentPath: (string | number)[],
+  child: DocumentNode
+): (string | number)[] | null {
+  let path = [...startParentPath]
+
+  while (path.length >= 0) {
+    const parent = getNodeAtPath(document, path)
+    if (isDocumentNode(parent) && canBeChild(parent, child)) {
+      return path
+    }
+    path = path.slice(0, -2)
+  }
+
+  return null
+}
+
+
+function canBeChild(parent: DocumentNode, child: DocumentNode): boolean {
+  return getLevel(parent) < getLevel(child)
+}
+
+
+export function transformToHeading(
+  state: EditorState,
+  newType: "subtitle" | "subsubtitle"
+) {
+  const blockPath = findBlockPath(state.document, state.cursor.path)
+  if (!blockPath) return
+
+  const rawBlock = getNodeAtPath(state.document, blockPath)
+  if (!isDocumentNode(rawBlock)) return
+  const block = rawBlock
+
+  const oldParentPath = blockPath.slice(0, -2)
+  const index = blockPath[blockPath.length - 1]
+  if (typeof index !== "number") return
+
+  // Change type first (needed for level comparison)
+  block.type = newType
+  block.children ??= []
+
+  // Find valid parent
+  const validParentPath = findValidParentPath(
+    state.document,
+    oldParentPath,
+    block
+  )
+  if (!validParentPath) return
+
+  const rawValidParent = getNodeAtPath(state.document, validParentPath)
+  if (!isDocumentNode(rawValidParent)) return
+  const validParent = rawValidParent
+
+  // Remove from old parent
+  const oldParent = getNodeAtPath(state.document, oldParentPath) as DocumentNode
+  oldParent.children!.splice(index, 1)
+
+  // Insert into valid parent
+  validParent.children ??= []
+  validParent.children.push(block)
+
+  const newIndex = validParent.children.length - 1
+
+  // Re-parent following siblings (only if same parent originally)
+  if (pathsEqual(oldParentPath, validParentPath)) {
+    let i = newIndex + 1
+    while (i < validParent.children.length) {
+      const sibling = validParent.children[i]
+      if (getLevel(sibling) <= getLevel(block)) break
+      block.children.push(sibling)
+      validParent.children.splice(i, 1)
+    }
+  }
+
+  // Move cursor
+  state.cursor.path = [
+    ...validParentPath,
+    "children",
+    newIndex,
+    "content",
+    0
+  ]
+  state.cursor.offset = 0
 }
 
