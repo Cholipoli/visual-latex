@@ -126,3 +126,81 @@ export function moveCursorVertical(state: EditorState, dir: -1 | 1) {
   state.cursor.offset = 0
 }
 
+function createEmptyParagraph(): DocumentNode {
+  return {
+    type: "paragraph",
+    content: [{ type: "text", value: "" }]
+  }
+}
+
+function findBlockPath(
+  document: DocumentNode,
+  path: (string | number)[]
+): (string | number)[] | null {
+  for (let i = path.length; i >= 0; i--) {
+    const subPath = path.slice(0, i)
+    const node = getNodeAtPath(document, subPath)
+    if (
+      node &&
+      typeof node === "object" &&
+      "type" in node &&
+      (node.type === "paragraph" ||
+       node.type === "title" ||
+       node.type === "subtitle")
+    ) {
+      return subPath
+    }
+  }
+  return null
+}
+
+export function createNewNode(state: EditorState, root: HTMLElement) {
+  const blockPath = findBlockPath(state.document, state.cursor.path)
+  if (!blockPath) return
+
+  const blockNode = getNodeAtPath(state.document, blockPath)
+  if (!blockNode || !("type" in blockNode)) return
+
+  const newParagraph = createEmptyParagraph()
+
+  // ───────────── CASE 1: paragraph → sibling ─────────────
+  if (blockNode.type === "paragraph") {
+    const index = blockPath[blockPath.length - 1]
+    if (typeof index !== "number") return
+
+    const parentPath = blockPath.slice(0, -2)
+    const parent = getNodeAtPath(state.document, parentPath)
+
+    if (!parent || !("children" in parent) || !parent.children) return
+
+    parent.children.splice(index + 1, 0, newParagraph)
+
+    state.cursor.path = [
+      ...parentPath,
+      "children",
+      index + 1,
+      "content",
+      0
+    ]
+    state.cursor.offset = 0
+    console.log(state.cursor.path)
+  }
+
+  // ───────────── CASE 2: title → child paragraph ─────────────
+  else if (blockNode.type === "title" || blockNode.type === "subtitle") {
+    if (!blockNode.children) blockNode.children = []
+
+    blockNode.children.unshift(newParagraph)
+
+    state.cursor.path = [
+      ...blockPath,
+      "children",
+      0,
+      "content",
+      0
+    ]
+    state.cursor.offset = 0
+    console.log(state.cursor.path)
+  }
+}
+

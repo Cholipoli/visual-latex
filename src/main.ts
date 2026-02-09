@@ -2,7 +2,7 @@ import { createInitialState } from "./editor/editor"
 import { render } from "./render/render"
 import { insertChar } from "./editor/editor"
 import { supChar } from "./editor/editor"
-import { moveCursor, moveCursorVertical } from "./editor/editor"
+import { moveCursor, moveCursorVertical, createNewNode } from "./editor/editor"
 
 const state = createInitialState()
 const root = document.getElementById("editor")!
@@ -35,6 +35,9 @@ window.addEventListener("keydown", (e) => {
   else if(e.key === "ArrowDown"){
     moveCursorVertical(state, 1)
     render(state, root)
+  }
+  else if(e.key === "Enter"){
+    createNewNode(state, root)
   }
 })
 
